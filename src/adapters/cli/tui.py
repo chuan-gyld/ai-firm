@@ -234,7 +234,7 @@ class AICompanyApp(App):
         border: tall $warning;
         width: 60%;
         height: auto;
-        margin: 4 auto;
+        margin: 4 8;
     }
     
     #clarification-title {
@@ -283,7 +283,7 @@ class AICompanyApp(App):
         self._on_resume = on_resume
         self._on_inject = on_inject
         self._on_quit = on_quit
-        self._start_time = datetime.now(timezone.utc)
+        self._session_start_time = datetime.now(timezone.utc)  # Renamed to avoid conflict with Textual's _start_time
         self._pending_clarification: Optional[tuple[Task, Callable[[str], None]]] = None
     
     def compose(self) -> ComposeResult:
@@ -319,7 +319,7 @@ class AICompanyApp(App):
         header.project_name = self.project.name
         header.project_state = self.project.state.value
         
-        elapsed = datetime.now(timezone.utc) - self._start_time
+        elapsed = datetime.now(timezone.utc) - self._session_start_time
         mins = int(elapsed.total_seconds() // 60)
         secs = int(elapsed.total_seconds() % 60)
         header.elapsed_time = f"{mins}m {secs}s"
