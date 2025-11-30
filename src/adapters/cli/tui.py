@@ -313,9 +313,12 @@ class AICompanyApp(App):
         self._update_header()
         self.set_interval(1.0, self._refresh_display)
         
-        # Signal that TUI is ready
+        # Add initial system message
+        self.add_system_message("Dashboard ready", "green")
+        
+        # Signal that TUI is ready - use set_timer for immediate execution
         if hasattr(self, '_on_ready') and self._on_ready:
-            self.call_later(self._on_ready)
+            self.set_timer(0.1, self._on_ready)
     
     def set_on_ready(self, callback: Callable[[], None]) -> None:
         """Set callback to run when TUI is mounted and ready"""
