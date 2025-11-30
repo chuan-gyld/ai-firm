@@ -90,33 +90,55 @@ uv run python -m src.main
 
 ### What happens
 
-1. **Dashboard appears** showing real-time agent status
+1. **Interactive TUI dashboard** appears showing real-time agent status
 2. **Agents work autonomously** - PM creates requirements, Architect designs, Developer codes
-3. **You get asked for clarification** if agents need more info
+3. **You get asked for clarification** if agents need more info (modal dialog in TUI)
 4. **You approve milestones** when agents complete major phases
 5. **Output is delivered** to `./output/<project-id>/`
 
-## Example Session
+### Keyboard Controls
+
+| Key | Action |
+|-----|--------|
+| `p` | Pause all agents |
+| `r` | Resume all agents |
+| `i` | Inject guidance (opens input dialog) |
+| `s` | Show detailed status |
+| `q` | Quit |
+
+## Interactive Dashboard
+
+The AI Company features a fully interactive terminal UI built with Textual:
 
 ```
-🏢 AI Company
-Autonomous Product Realization System
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ 🏢 AI Company                                                    12:34:56 PM │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ 📋 CLI Todo App  |  State: implementation  |  Elapsed: 5m 23s               │
+├────────────────────────────────┬─────────────────────────────────────────────┤
+│ 👥 Agent Status                │ 📜 Activity Log                            │
+│ ┌────────────────────────────┐ │ ┌─────────────────────────────────────────┐ │
+│ │ Agent     Status  Work     │ │ │ 2m  pm → architect: Requirements Ready │ │
+│ │ ───────────────────────────│ │ │ 1m  architect → dev: Design Complete   │ │
+│ │ PM        🟢 Done  ✓       │ │ │ 30s developer: Implementing auth...    │ │
+│ │ Architect 🟢 Done  ✓       │ │ │ 10s dev → tester: Code ready for test  │ │
+│ │ Developer 🟢 Working       │ │ │ ▶ Starting AI Company with idea...     │ │
+│ │ Tester    🔵 Idle          │ │ └─────────────────────────────────────────┘ │
+│ └────────────────────────────┘ │                                             │
+├────────────────────────────────┴─────────────────────────────────────────────┤
+│ 📊 Done: 12 | Pending: 3 | Blockers: 0 | Signoff: 2/4                        │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ p Pause  r Resume  i Inject  s Status  q Quit                                │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
 
-Enter your product idea:
-Idea: Build a CLI todo app with SQLite persistence
+### Features
 
-🚀 Starting AI Company with idea:
-Build a CLI todo app with SQLite persistence
-
-┌─────────────────────────────────────────────────────────────────┐
-│ PROJECT: Build a CLI todo app...     STATUS: discovery          │
-│ AGENT        STATUS     CURRENT WORK                    INBOX   │
-│ ─────────────────────────────────────────────────────────────── │
-│ PM           🟢 Working  Creating requirements...         0     │
-│ Architect    🔵 Idle     Waiting                          0     │
-│ Developer    🔵 Idle     Waiting                          0     │
-│ Tester       🔵 Idle     Waiting                          0     │
-└─────────────────────────────────────────────────────────────────┘
+- **Real-time updates**: Agent status and activity log update live
+- **Interactive controls**: Pause, resume, inject guidance via keyboard
+- **Clarification modals**: When agents need input, a dialog appears
+- **Activity log**: See all inter-agent communication in real-time
+- **Metrics bar**: Track completed tasks, pending work, and blockers
 
 📝 Clarification Needed
 From: pm
