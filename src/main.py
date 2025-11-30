@@ -168,11 +168,19 @@ async def run_interactive(idea: str, config: dict) -> None:
         on_status_update=handle_status_tui,
     )
     
+    # Track runtime task and ready state
+    runtime_task: Optional[asyncio.Task] = None
+    tui_ready = False
+    pending_activities: list[Task] = []
+    
     # Activity logger
     def log_activity(task: Task):
         msg = Message.from_task(task)
         project.log_activity(task)
-        app.add_activity(msg)
+        if tui_ready:
+            app.add_activity(msg)
+        else:
+            pending_activities.append(task)
     
     # Patch the message bus to log activities
     original_send = runtime.message_bus.send
@@ -185,11 +193,14 @@ async def run_interactive(idea: str, config: dict) -> None:
         """Run the agent runtime"""
         try:
             app.add_system_message(f"Starting AI Company with idea: {idea}", "green")
+            app.add_system_message("PM is analyzing the idea...", "cyan")
             await runtime.start(idea)
         except asyncio.CancelledError:
             app.add_system_message("Runtime cancelled", "yellow")
         except Exception as e:
             app.add_system_message(f"Runtime error: {e}", "red")
+            import traceback
+            traceback.print_exc()
         finally:
             # Save final state
             await storage.save_project(project)
@@ -208,19 +219,29 @@ async def run_interactive(idea: str, config: dict) -> None:
             if project.state.value == "delivered":
                 app.show_delivered(output_files)
     
-    # Run both the TUI and the runtime concurrently
-    async def run_app():
-        await app.run_async()
+    def start_runtime():
+        """Start the runtime after TUI is ready"""
+        nonlocal runtime_task, tui_ready
+        tui_ready = True
+        
+        # Flush any pending activities
+        for task in pending_activities:
+            msg = Message.from_task(task)
+            app.add_activity(msg)
+        pending_activities.clear()
+        
+        runtime_task = asyncio.create_task(run_runtime())
+        app.add_system_message("Runtime started", "green")
+    
+    # Set the callback to start runtime when TUI is ready
+    app.set_on_ready(start_runtime)
     
     try:
-        # Start both tasks
-        runtime_task = asyncio.create_task(run_runtime())
-        
         # Run the TUI (this blocks until quit)
-        await run_app()
+        await app.run_async()
         
         # Cancel runtime if still running
-        if not runtime_task.done():
+        if runtime_task and not runtime_task.done():
             runtime_task.cancel()
             try:
                 await runtime_task

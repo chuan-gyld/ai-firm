@@ -312,6 +312,14 @@ class AICompanyApp(App):
         self.sub_title = self.project.name
         self._update_header()
         self.set_interval(1.0, self._refresh_display)
+        
+        # Signal that TUI is ready
+        if hasattr(self, '_on_ready') and self._on_ready:
+            self.call_later(self._on_ready)
+    
+    def set_on_ready(self, callback: Callable[[], None]) -> None:
+        """Set callback to run when TUI is mounted and ready"""
+        self._on_ready = callback
     
     def _update_header(self) -> None:
         """Update header information"""
