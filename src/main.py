@@ -9,13 +9,13 @@ from typing import Optional
 import yaml
 from rich.console import Console
 from rich.prompt import Prompt, Confirm
+from rich.live import Live
 
 from .core.models import Project, Task, Message, AgentRole
 from .core.ports.llm import LLMMessage
 from .adapters.llm_litellm import LiteLLMAdapter
 from .adapters.storage_sqlite import SQLiteStorageAdapter
 from .adapters.cli.dashboard import TerminalDashboard, print_welcome, print_delivered
-from .adapters.cli.tui import AICompanyApp, run_tui
 from .runtime.loop import AgentRuntime, SystemCommand
 
 
@@ -77,7 +77,7 @@ def handle_status_update(summary: str) -> None:
 
 
 async def run_interactive(idea: str, config: dict) -> None:
-    """Run the AI Company with interactive TUI"""
+    """Run the AI Company with a read-only Rich dashboard"""
     
     # Initialize adapters
     llm = LiteLLMAdapter(
@@ -100,161 +100,98 @@ async def run_interactive(idea: str, config: dict) -> None:
     project.output_directory = str(storage.output_dir / str(project.id))
     project.initialize_agents()
     
-    # Variables to hold runtime and app references
-    runtime: Optional[AgentRuntime] = None
-    app: Optional[AICompanyApp] = None
+    # Create dashboard
+    dashboard = TerminalDashboard(project)
     output_files: list[str] = []
-    
-    # Callbacks for TUI actions
-    async def on_pause():
-        if runtime:
-            await runtime.send_command(SystemCommand(command="pause"))
-    
-    async def on_resume():
-        if runtime:
-            await runtime.send_command(SystemCommand(command="resume"))
-    
-    async def on_inject(guidance: str):
-        if runtime:
-            await runtime.send_command(SystemCommand(
-                command="inject",
-                payload=guidance,
-            ))
-    
-    async def on_quit():
-        if runtime:
-            await runtime.stop()
-    
-    # Create TUI app
-    app = AICompanyApp(
-        project=project,
-        on_pause=on_pause,
-        on_resume=on_resume,
-        on_inject=on_inject,
-        on_quit=on_quit,
-    )
-    
-    # Clarification handler that uses the TUI
-    clarification_response: Optional[str] = None
-    clarification_event = asyncio.Event()
-    
-    async def handle_clarification_tui(task: Task) -> str:
-        nonlocal clarification_response
-        clarification_event.clear()
-        
-        def on_response(answer: str):
-            nonlocal clarification_response
-            clarification_response = answer
-            clarification_event.set()
-        
-        # Request clarification through TUI
-        app.request_clarification(task, on_response)
-        
-        # Wait for response
-        await clarification_event.wait()
-        return clarification_response or ""
-    
-    # Status update handler
-    def handle_status_tui(summary: str):
-        pass  # TUI handles its own updates
     
     # Create runtime
     runtime = AgentRuntime(
         project=project,
         llm=llm,
         storage=storage,
-        on_clarification_needed=handle_clarification_tui,
+        on_clarification_needed=handle_clarification,
         on_milestone_reached=handle_milestone,
-        on_status_update=handle_status_tui,
+        on_status_update=handle_status_update,
     )
     
-    # Track runtime task and ready state
-    runtime_task: Optional[asyncio.Task] = None
-    tui_ready = False
-    pending_activities: list[Task] = []
-    
-    # Activity logger
-    def log_activity(task: Task):
-        msg = Message.from_task(task)
-        project.log_activity(task)
-        if tui_ready:
-            app.add_activity(msg)
-        else:
-            pending_activities.append(task)
-    
-    # Patch the message bus to log activities
+    # Activity logger - add to dashboard
     original_send = runtime.message_bus.send
     async def logged_send(task: Task):
         await original_send(task)
-        log_activity(task)
+        msg = Message.from_task(task)
+        project.log_activity(task)
+        dashboard.add_activity(msg)
     runtime.message_bus.send = logged_send
     
-    async def run_runtime():
-        """Run the agent runtime"""
+    console.print(f"\n[bold green]🚀 Starting AI Company[/bold green]")
+    console.print(f"[cyan]Idea:[/cyan] {idea}")
+    console.print(f"[dim]Press Ctrl+C to stop[/dim]\n")
+    
+    async def run_with_dashboard():
+        """Run the runtime with live dashboard updates"""
+        runtime_task = asyncio.create_task(runtime.start(idea))
+        
         try:
-            app.add_system_message(f"Starting AI Company with idea: {idea}", "green")
-            app.add_system_message("PM is analyzing the idea...", "cyan")
-            await runtime.start(idea)
+            # Use Rich Live for auto-updating display
+            with Live(dashboard.render_dashboard(), refresh_per_second=1, console=console) as live:
+                while not runtime._shutdown_requested:
+                    live.update(dashboard.render_dashboard())
+                    
+                    # Check for convergence
+                    if project.all_agents_signed_off():
+                        break
+                    
+                    # Check if runtime finished
+                    if runtime_task.done():
+                        # Check for exception
+                        try:
+                            runtime_task.result()
+                        except Exception as e:
+                            console.print(f"\n[red]Runtime error: {e}[/red]")
+                        break
+                    
+                    await asyncio.sleep(1.0)
         except asyncio.CancelledError:
-            app.add_system_message("Runtime cancelled", "yellow")
-        except Exception as e:
-            app.add_system_message(f"Runtime error: {e}", "red")
-            import traceback
-            traceback.print_exc()
-        finally:
-            # Save final state
-            await storage.save_project(project)
-            
-            # Write output files
-            nonlocal output_files
-            for artifact in project.artifacts.values():
-                if artifact.file_path and artifact.content:
-                    await storage.write_output_file(
-                        project.id,
-                        artifact.file_path,
-                        artifact.content,
-                    )
-                    output_files.append(artifact.file_path)
-            
-            if project.state.value == "delivered":
-                app.show_delivered(output_files)
-    
-    def start_runtime():
-        """Start the runtime after TUI is ready"""
-        nonlocal runtime_task, tui_ready
-        tui_ready = True
+            pass
         
-        # Flush any pending activities
-        for task in pending_activities:
-            msg = Message.from_task(task)
-            app.add_activity(msg)
-        pending_activities.clear()
-        
-        runtime_task = asyncio.create_task(run_runtime())
-        app.add_system_message("Runtime started", "green")
-    
-    # Set the callback to start runtime when TUI is ready
-    app.set_on_ready(start_runtime)
-    
-    try:
-        # Run the TUI (this blocks until quit)
-        await app.run_async()
-        
-        # Cancel runtime if still running
-        if runtime_task and not runtime_task.done():
+        # Stop runtime if still running
+        if not runtime_task.done():
+            await runtime.stop()
             runtime_task.cancel()
             try:
                 await runtime_task
             except asyncio.CancelledError:
                 pass
-        
+    
+    try:
+        await run_with_dashboard()
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Interrupted by user[/yellow]")
+        await runtime.stop()
     except Exception as e:
         console.print(f"\n[red]Error: {e}[/red]")
-        raise
+        import traceback
+        traceback.print_exc()
+    finally:
+        # Save final state
+        await storage.save_project(project)
     
-    # Print final summary to console after TUI exits
-    if output_files:
+    # Write output files
+    for artifact in project.artifacts.values():
+        if artifact.file_path and artifact.content:
+            await storage.write_output_file(
+                project.id,
+                artifact.file_path,
+                artifact.content,
+            )
+            output_files.append(artifact.file_path)
+    
+    # Print delivery summary
+    if project.state.value == "delivered":
         print_delivered(console, project, output_files)
+    else:
+        console.print(f"\n[yellow]Project state: {project.state.value}[/yellow]")
+        dashboard.print_summary()
 
 
 async def run_simple(idea: str, config: dict) -> None:
