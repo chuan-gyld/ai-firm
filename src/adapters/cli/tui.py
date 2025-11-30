@@ -77,12 +77,20 @@ class ActivityLogWidget(Static):
         self._messages.append(msg)
         log = self.query_one("#activity-log", Log)
         
-        now = datetime.now(timezone.utc)
-        time_ago = now - msg.timestamp.replace(tzinfo=timezone.utc)
-        if time_ago.total_seconds() < 60:
-            time_str = f"{int(time_ago.total_seconds())}s"
-        else:
-            time_str = f"{int(time_ago.total_seconds() // 60)}m"
+        # Handle both naive and aware datetimes
+        try:
+            now = datetime.now(timezone.utc)
+            timestamp = msg.timestamp
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=timezone.utc)
+            time_ago = now - timestamp
+            seconds = time_ago.total_seconds()
+            if seconds < 60:
+                time_str = f"{int(seconds)}s"
+            else:
+                time_str = f"{int(seconds // 60)}m"
+        except (TypeError, AttributeError):
+            time_str = "now"
         
         log.write_line(f"[dim]{time_str}[/] [cyan]{msg.from_agent} → {msg.to_agent}[/]: {msg.summary}")
     
