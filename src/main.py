@@ -28,11 +28,12 @@ def load_config(config_path: str = "config/settings.yaml") -> dict:
         with open(config_file) as f:
             return yaml.safe_load(f)
     
-    # Default config
+    # Default config (using Zhipu GLM-4)
     return {
         "llm": {
-            "model": "claude-sonnet-4-20250514",
-            "fallback_model": "gpt-4o",
+            "model": "openai/glm-4-plus",
+            "api_base": "https://open.bigmodel.cn/api/paas/v4",
+            "fallback_model": None,
             "temperature": 0.7,
             "max_tokens": 4096,
         },
@@ -79,6 +80,7 @@ async def run_interactive(idea: str, config: dict) -> None:
     # Initialize adapters
     llm = LiteLLMAdapter(
         default_model=config["llm"]["model"],
+        api_base=config["llm"].get("api_base"),
         fallback_model=config["llm"].get("fallback_model"),
         temperature=config["llm"].get("temperature", 0.7),
         max_tokens=config["llm"].get("max_tokens", 4096),

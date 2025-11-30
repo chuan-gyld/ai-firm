@@ -2,12 +2,16 @@
 
 # LLM Settings (configurable)
 llm:
-  # Default model - can be changed to any LiteLLM-supported model
-  # Examples: claude-3-5-sonnet-20241022, gpt-4o, claude-3-opus-20240229
-  model: "claude-sonnet-4-20250514"
+  # Default model - using Zhipu GLM-4 via OpenAI-compatible endpoint
+  # Format for OpenAI-compatible: openai/<model-name>
+  # Set ZHIPU_API_KEY environment variable for authentication
+  model: "openai/glm-4-plus"
   
-  # Fallback model if primary fails
-  fallback_model: "gpt-4o"
+  # API base URL for Zhipu AI
+  api_base: "https://open.bigmodel.cn/api/paas/v4"
+  
+  # Fallback model if primary fails (optional, requires OPENAI_API_KEY)
+  fallback_model: null
   
   # Temperature for generation (0.0 = deterministic, 1.0 = creative)
   temperature: 0.7

@@ -39,17 +39,32 @@ pip install -e .
 
 ## Configuration
 
-Set your API key:
+Set your API key (default uses Zhipu AI GLM-4):
 ```bash
-export ANTHROPIC_API_KEY='your-key'  # For Claude models
-# or
-export OPENAI_API_KEY='your-key'     # For OpenAI models
+# For Zhipu GLM models (default)
+export ZHIPU_API_KEY='your-key'
+# Get your API key from: https://open.bigmodel.cn/
+
+# Alternative: For Claude models
+export ANTHROPIC_API_KEY='your-key'
+
+# Alternative: For OpenAI models
+export OPENAI_API_KEY='your-key'
 ```
 
 Configure in `config/settings.yaml`:
 ```yaml
 llm:
-  model: "claude-sonnet-4-20250514"  # Or gpt-4o, etc.
+  # Default: Zhipu GLM-4 Plus
+  model: "openai/glm-4-plus"
+  api_base: "https://open.bigmodel.cn/api/paas/v4"
+  
+  # Alternative models:
+  # model: "openai/glm-4"           # Zhipu GLM-4
+  # model: "openai/glm-4-flash"     # Zhipu GLM-4 Flash (faster)
+  # model: "claude-sonnet-4-20250514"  # Claude (requires ANTHROPIC_API_KEY)
+  # model: "gpt-4o"                 # OpenAI (requires OPENAI_API_KEY)
+  
   temperature: 0.7
   max_tokens: 4096
 ```

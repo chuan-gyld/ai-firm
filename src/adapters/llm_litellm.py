@@ -16,6 +16,7 @@ class LiteLLMAdapter(LLMPort):
     LLM adapter using LiteLLM for multi-provider support.
     
     Supports:
+    - Zhipu AI: glm-4-plus, glm-4 (via OpenAI-compatible endpoint)
     - OpenAI: gpt-4o, gpt-4-turbo, gpt-3.5-turbo
     - Anthropic: claude-3-opus, claude-3-sonnet, claude-3-haiku
     - And many more through LiteLLM
@@ -23,12 +24,14 @@ class LiteLLMAdapter(LLMPort):
     
     def __init__(
         self,
-        default_model: str = "claude-sonnet-4-20250514",
-        fallback_model: Optional[str] = "gpt-4o",
+        default_model: str = "openai/glm-4-plus",
+        api_base: Optional[str] = "https://open.bigmodel.cn/api/paas/v4",
+        fallback_model: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
     ):
         self._default_model = default_model
+        self._api_base = api_base
         self._fallback_model = fallback_model
         self._default_temperature = temperature
         self._default_max_tokens = max_tokens
@@ -36,25 +39,47 @@ class LiteLLMAdapter(LLMPort):
         # Configure LiteLLM
         litellm.set_verbose = False
         
-        # Check for API keys
-        self._validate_api_keys()
+        # Check for API keys and get the appropriate one
+        self._api_key = self._get_api_key()
     
-    def _validate_api_keys(self) -> None:
-        """Check that required API keys are set"""
+    def _get_api_key(self) -> str:
+        """Get the appropriate API key based on model"""
         model = self._default_model.lower()
         
+        # For Zhipu GLM models (OpenAI-compatible)
+        if "glm" in model:
+            api_key = os.environ.get("ZHIPU_API_KEY")
+            if not api_key:
+                raise ValueError(
+                    "ZHIPU_API_KEY environment variable required for Zhipu GLM models. "
+                    "Set it with: export ZHIPU_API_KEY='your-key'\n"
+                    "Get your API key from: https://open.bigmodel.cn/"
+                )
+            return api_key
+        
+        # For Claude/Anthropic models
         if "claude" in model or "anthropic" in model:
-            if not os.environ.get("ANTHROPIC_API_KEY"):
+            api_key = os.environ.get("ANTHROPIC_API_KEY")
+            if not api_key:
                 raise ValueError(
                     "ANTHROPIC_API_KEY environment variable required for Claude models. "
                     "Set it with: export ANTHROPIC_API_KEY='your-key'"
                 )
-        elif "gpt" in model or "openai" in model:
-            if not os.environ.get("OPENAI_API_KEY"):
+            return api_key
+        
+        # For OpenAI models (including openai/ prefix for compatible endpoints)
+        if "gpt" in model or "openai" in model:
+            # Check for ZHIPU_API_KEY first if using openai/ prefix with glm
+            api_key = os.environ.get("OPENAI_API_KEY")
+            if not api_key:
                 raise ValueError(
                     "OPENAI_API_KEY environment variable required for OpenAI models. "
                     "Set it with: export OPENAI_API_KEY='your-key'"
                 )
+            return api_key
+        
+        # Default: try OPENAI_API_KEY
+        return os.environ.get("OPENAI_API_KEY", "")
     
     async def complete(
         self,
@@ -77,13 +102,24 @@ class LiteLLMAdapter(LLMPort):
         ]
         
         try:
-            response = await acompletion(
-                model=model,
-                messages=llm_messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                stop=stop,
-            )
+            # Build kwargs for the API call
+            kwargs = {
+                "model": model,
+                "messages": llm_messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            }
+            
+            if stop:
+                kwargs["stop"] = stop
+            
+            # Add api_base and api_key for OpenAI-compatible endpoints (like Zhipu)
+            if self._api_base:
+                kwargs["api_base"] = self._api_base
+            if self._api_key:
+                kwargs["api_key"] = self._api_key
+            
+            response = await acompletion(**kwargs)
             
             return LLMResponse(
                 content=response.choices[0].message.content,
@@ -170,6 +206,11 @@ Respond ONLY with the JSON, no other text."""
     def get_available_models(self) -> list[str]:
         """Get list of commonly used models"""
         return [
+            # Zhipu AI (default)
+            "openai/glm-4-plus",
+            "openai/glm-4",
+            "openai/glm-4-air",
+            "openai/glm-4-flash",
             # Anthropic
             "claude-sonnet-4-20250514",
             "claude-3-5-sonnet-20241022",
