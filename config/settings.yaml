@@ -1,0 +1,48 @@
+# AI Company Configuration
+
+# LLM Settings (configurable)
+llm:
+  # Default model - can be changed to any LiteLLM-supported model
+  # Examples: claude-3-5-sonnet-20241022, gpt-4o, claude-3-opus-20240229
+  model: "claude-sonnet-4-20250514"
+  
+  # Fallback model if primary fails
+  fallback_model: "gpt-4o"
+  
+  # Temperature for generation (0.0 = deterministic, 1.0 = creative)
+  temperature: 0.7
+  
+  # Max tokens per response
+  max_tokens: 4096
+
+# Agent Settings
+agents:
+  # How long to wait before checking inbox again when idle (seconds)
+  idle_poll_interval: 0.5
+  
+  # Maximum concurrent tasks an agent can have in WIP
+  max_wip: 1
+
+# Project Settings
+project:
+  # Output directory for generated code
+  output_dir: "./output"
+  
+  # State persistence
+  state_db: "./state.db"
+
+# Dashboard Settings
+dashboard:
+  # How often to refresh status (seconds)
+  refresh_interval: 1.0
+  
+  # How many recent activities to show
+  recent_activity_limit: 10
+
+# Human Interaction
+interaction:
+  # Timeout for clarification requests (seconds, 0 = no timeout)
+  clarification_timeout: 0
+  
+  # Milestone verification required
+  require_milestone_approval: true
