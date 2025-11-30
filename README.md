@@ -26,18 +26,15 @@ You only interact for:
 ## Installation
 
 ```bash
-# Clone and enter directory
+# Clone the repository
+git clone https://github.com/chuan-gyld/ai-firm.git
 cd ai-firm
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
+# Install with uv (recommended)
+uv sync
 
-# Install dependencies
+# Or install with pip
 pip install -e .
-
-# Or with uv
-uv pip install -e .
 ```
 
 ## Configuration
@@ -62,13 +59,17 @@ llm:
 ### Run with an idea
 
 ```bash
+# With uv
+uv run python -m src.main "Build a CLI todo app with SQLite persistence"
+
+# Or with activated venv
 python -m src.main "Build a CLI todo app with SQLite persistence"
 ```
 
 ### Interactive prompt
 
 ```bash
-python -m src.main
+uv run python -m src.main
 # Then enter your idea when prompted
 ```
 
@@ -225,14 +226,17 @@ dashboard:
 ## Development
 
 ```bash
-# Install dev dependencies
-pip install -e ".[dev]"
+# Install with dev dependencies
+uv sync
 
 # Run tests
-pytest
+uv run pytest
 
 # Lint
-ruff check src/
+uv run ruff check src/
+
+# Format
+uv run ruff format src/
 ```
 
 ## License
