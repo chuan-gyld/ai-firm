@@ -174,8 +174,9 @@ class Message:
     @classmethod
     def from_task(cls, task: Task) -> "Message":
         """Create a message summary from a task"""
-        sender = task.sender if isinstance(task.sender, str) else task.sender.value
-        recipient = task.recipient if isinstance(task.recipient, str) else task.recipient.value
+        # Handle both enum and string types for sender/recipient
+        sender = str(task.sender.value) if hasattr(task.sender, 'value') else str(task.sender)
+        recipient = str(task.recipient.value) if hasattr(task.recipient, 'value') else str(task.recipient)
         
         return cls(
             id=task.id,
