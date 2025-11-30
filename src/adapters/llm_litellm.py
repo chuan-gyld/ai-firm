@@ -136,7 +136,8 @@ class LiteLLMAdapter(LLMPort):
         except Exception as e:
             # Try fallback model if available
             if self._fallback_model and model != self._fallback_model:
-                print(f"Primary model {model} failed, trying fallback {self._fallback_model}: {e}")
+                import sys
+                print(f"[LLM] Primary model {model} failed, trying fallback {self._fallback_model}: {e}", file=sys.stderr)
                 return await self.complete(
                     messages=messages,
                     model=self._fallback_model,
@@ -144,6 +145,8 @@ class LiteLLMAdapter(LLMPort):
                     max_tokens=max_tokens,
                     stop=stop,
                 )
+            import sys
+            print(f"[LLM] Error calling {model}: {e}", file=sys.stderr)
             raise
     
     async def complete_with_structured_output(

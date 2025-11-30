@@ -123,8 +123,12 @@ class BaseAgent(ABC):
             self.state.complete_task()
             
         except Exception as e:
-            print(f"[{self.role.value}] Error processing task: {e}")
+            import sys
+            import traceback
+            print(f"[{self.role.value}] Error processing task: {e}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
             self.state.update_status(AgentStatus.IDLE)
+            self.state.waiting_reason = f"Error: {str(e)[:50]}"
             # Requeue with lower priority on error
             task.priority = Priority.LOW
             await self.queue.requeue(task)
